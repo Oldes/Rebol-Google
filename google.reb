@@ -6,7 +6,7 @@ Rebol [
 	File:    %google.reb
 	Name:    'google
 	Type:    'module
-	Version:  0.0.2
+	Version:  0.0.3
 	Require: 'httpd
 	Note: {
 		Useful info:
@@ -152,7 +152,7 @@ authorize: function [
 		return none
 	]
 
-	sys/log/debug 'GOOGLE result
+	;probe result
 
 	;-- 2. Request refresh and access tokens using the result code
 	try/with [
@@ -160,10 +160,10 @@ authorize: function [
 		result: write/all https://www.googleapis.com/oauth2/v4/token compose [
 			POST [
 				Content-Type: "application/x-www-form-urlencoded"
-			] ( probe rejoin [
+			] ( rejoin [
 				"grant_type=authorization_code"
 				"&code="          result/code
-				"&scope="        enhex :scopes
+				"&scope="         ;enhex :scopes ;; required here?
 				"&redirect_uri="  redirect-uri
 				"&client_id="     ctx/client-id
 				"&client_secret=" ctx/client-secret
@@ -187,7 +187,7 @@ authorize: function [
 		sys/log/error 'GOOGLE system/state/last-error
 		return none
 	]
-
+	sys/log/debug 'GOOGLE ["access_token: " copy/part ctx/token/access_token 15 "..."]
 	store-config ctx
 ]
 
@@ -217,7 +217,8 @@ request: func [
 
 	try/with [
 		ctx: config
-		unless ctx/token [authorize ctx]
+		unless ctx/token [ctx: authorize ctx] ;; resolve the token
+		unless ctx/token [return none  ] ;; exit if still not present
 		if now >= ctx/token/expires_in [ refresh ctx ]
 		header/Authorization: join "Bearer " ctx/token/access_token
 		if map? data [
@@ -231,13 +232,12 @@ request: func [
 		data: load-json result/3
 		either result/1 >= 400 [
 			sys/log/error 'GOOGLE ["Failed" method "of" as-green what]
-			if result/error [
-				sys/log/error 'GOOGLE [result/error_description "-" result/error]
+			if data/error [
+				sys/log/error 'GOOGLE [data/error_description "-" data/error]
 			]
 			none
 		][	data ]
 	][
-		sys/log/error 'GOOGLE ["Failed" method "of" as-green what]
 		sys/log/error 'GOOGLE system/state/last-error
 		none
 	]
@@ -253,16 +253,16 @@ people: context [
 	profile: does [
 		;; https://developers.google.com/people/v1/profiles
 		;; requires scope: auth/userinfo.profile
-		api-get https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses
+		api-get https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,phoneNumbers
 	]
 	contacts: does [
 		;; https://developers.google.com/people/v1/contacts
 		;; requires scope: auth/contacts.readonly
-		api-get https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses
+		api-get https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers
 	]
 	other-contacts: does [
 		;; https://developers.google.com/people/v1/other-contacts
 		;; requires scope: auth/contacts.other.readonly
-		api-get https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses
+		api-get https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses,phoneNumbers
 	]
 ]

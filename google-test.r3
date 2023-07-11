@@ -13,11 +13,13 @@ google: import %google.reb
 ;probe google/people/profile
 data: google/people/contacts
 foreach person data/connections [
+	prin as-green person/names/1/displayName
 	if person/emailAddresses [
-		print [
-			as-green person/names/1/displayName
-			person/emailAddresses/1/value
-		]
+		prin SP	prin person/emailAddresses/1/value
 	]
+	if person/phoneNumbers [
+		prin SP	prin person/phoneNumbers/1/value
+	]
+	prin LF
 ]
 ;probe google/people/other-contacts
