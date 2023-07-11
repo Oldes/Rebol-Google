@@ -6,7 +6,7 @@ Rebol [
 	File:    %google.reb
 	Name:    'google
 	Type:    'module
-	Version:  0.0.1
+	Version:  0.0.2
 	Require: 'httpd
 	Note: {
 		Useful info:
@@ -54,7 +54,7 @@ store-config: function[
 	"Save the current config state in user's persistent data storage"
 	config [map!]
 ][
-	lib/put system/user/data 'google-api config 
+	put system/user/data 'google-api config 
 	update system/user/data
 	config
 ]
@@ -152,7 +152,7 @@ authorize: function [
 		return none
 	]
 
-	probe result
+	sys/log/debug 'GOOGLE result
 
 	;-- 2. Request refresh and access tokens using the result code
 	try/with [
@@ -225,27 +225,27 @@ request: func [
 			header/Content-Type: "application/json"
 		]
 
-		result: write/all join https://people.googleapis.com/ what reduce [
+		result: write/all what reduce [
 			method header any [data ""]
 		]
 		data: load-json result/3
 		either result/1 >= 400 [
-			sys/log/error 'GOOGLE ["Google" method "of" mold what "failed!"]
+			sys/log/error 'GOOGLE ["Failed" method "of" as-green what]
 			if result/error [
 				sys/log/error 'GOOGLE [result/error_description "-" result/error]
 			]
 			none
 		][	data ]
 	][
-		sys/log/error 'GOOGLE ["Google" method "of" mold what "failed!"]
+		sys/log/error 'GOOGLE ["Failed" method "of" as-green what]
 		sys/log/error 'GOOGLE system/state/last-error
 		none
 	]
 ]
 
-get: func [what [any-string!]           ][request 'GET    what none]
-put: func [what [any-string!] /with data][request 'PUT    what data]
-del: func [what [any-string!]           ][request 'DELETE what none]
+api-get: func [what [any-string!]           ][request 'GET    what none]
+api-put: func [what [any-string!] /with data][request 'PUT    what data]
+api-del: func [what [any-string!]           ][request 'DELETE what none]
 
 
 ;@@ TODO: write more API functions....
@@ -253,16 +253,16 @@ people: context [
 	profile: does [
 		;; https://developers.google.com/people/v1/profiles
 		;; requires scope: auth/userinfo.profile
-		get %v1/people/me?personFields=names,emailAddresses
+		api-get https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses
 	]
 	contacts: does [
 		;; https://developers.google.com/people/v1/contacts
 		;; requires scope: auth/contacts.readonly
-		get %v1/people/me/connections?personFields=names,emailAddresses
+		api-get https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses
 	]
 	other-contacts: does [
 		;; https://developers.google.com/people/v1/other-contacts
 		;; requires scope: auth/contacts.other.readonly
-		get %v1/otherContacts?readMask=names,emailAddresses
+		api-get https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses
 	]
 ]

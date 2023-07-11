@@ -5,7 +5,7 @@ Rebol [
 	File:   %google-test.r3
 ]
 
-;system/options/quiet: false
+system/options/quiet: false
 google: import %google.reb
 
 ;google/drop-token ;; without token, user will be forced to authenticate again
