@@ -29,15 +29,15 @@ config: function[
 		;; when user does not exists, create a new one!
 		set-user/n/p :name :pass
 	]
-	ctx: user's 'google-api
+	ctx: user's google-api
 	unless map? ctx [
-		sys/log/error 'GOOGLE "Google API must be configured!"
-		ctx: make map! 6
+		sys/log/error 'GOOGLE "Client is not configured yet!"
+		ctx: make map! 4
 
 		unless all [
 			ctx/client-id:     ask/hide "Client ID: "
 			ctx/client-secret: ask/hide "Client Secret: "
-		][
+		][	;; when user hits ESC...
 			sys/log/error 'GOOGLE "Missing credentials!"
 			return #()
 		]
@@ -75,7 +75,7 @@ drop-token: function[
 	"Used to force authentication"
 ][
 	sys/log/debug 'GOOGLE "Releasing a user's token"
-	ctx: user's 'google-api
+	ctx: user's google-api
 	unless map? ctx [exit]
 	remove/key ctx 'token
 	store-config ctx
@@ -142,7 +142,7 @@ authorize: function [
 				ctx/out/status: 200
 				ctx/out/content: ajoin [
 					"<h1>OAuth2 Google Callback</h1>"
-					"<br/>Request header:<pre>" mold ctx/inp/header </pre>
+					"<br/>Header:<pre>" mold ctx/inp/header </pre>
 					"<br/>Values:<pre>" mold ctx/inp/target/values </pre>
 					"<h2>You can close this window and return back to Rebol</h2>"
 				]
@@ -193,7 +193,6 @@ authorize: function [
 			]
 			return none
 		]
-		
 	][
 		sys/log/error 'GOOGLE "Failed to receive Google token!"
 		sys/log/error 'GOOGLE system/state/last-error
