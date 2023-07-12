@@ -16,7 +16,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Rebol for extension test
+    - name: Install Rebol for the test
       uses: oldes/install-rebol@v3.11.0
       with:
         product: Bulk
@@ -27,7 +27,7 @@ jobs:
         REBOL_USER_FILE: ${{ secrets.REBOL_USER_FILE }}
       run: |
         echo $REBOL_USER_FILE > /home/runner/user.reb
-        ./rebol3 --do "? system/options ? system/user"
+        ./rebol3 --do "? system/user"
 
 
     - name: Test Google API module
