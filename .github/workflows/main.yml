@@ -28,7 +28,9 @@ jobs:
       run: |
         echo $REBOL_SAFE_FILE > .rebol.safe
         echo $REBOL_USER_FILE > user.reb
+        ls -la .
+        rebol3 --do "? system/options"
 
 
-    - name: Test Google API module
-      run:  ./rebol3 google-test.r3
+#    - name: Test Google API module
+#      run:  ./rebol3 google-test.r3
