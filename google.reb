@@ -6,11 +6,12 @@ Rebol [
 	File:    %google.reb
 	Name:    'google
 	Type:    'module
-	Version:  0.0.3
+	Version:  0.0.4
 	Require: 'httpd
 	Note: {
 		Useful info:
 		https://developers.google.com/identity/protocols/oauth2/scopes
+		https://developers.google.com/people/api/rest
 		https://aaronparecki.com/oauth-2-simplified/
 	}
 	Needs: 3.11.0 ;; using try/with instead of deprecated try/except
@@ -195,7 +196,7 @@ refresh: function[
 	ctx [map!]
 ][
 	sys/log/info 'GOOGLE "Refreshing Google API token."
-	ctx/token: load-json write https://accounts.spotify.com/api/token compose [
+	ctx/token: load-json write https://www.googleapis.com/oauth2/v4/token compose [
 		POST [
 			Content-Type: "application/x-www-form-urlencoded"
 		]( rejoin [
