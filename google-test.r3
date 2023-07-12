@@ -21,7 +21,7 @@ try/with [
 		result: clear []
 		until [
 			data: google/api-get rejoin [url "&pageToken=" any [nextPageToken ""]]
-			unless data [break]
+			if any [not data not data/connections][break]
 			append result data/connections
 			none? nextPageToken: data/nextPageToken
 		]
