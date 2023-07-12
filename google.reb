@@ -12,6 +12,7 @@ Rebol [
 		Useful info:
 		https://developers.google.com/identity/protocols/oauth2/scopes
 		https://developers.google.com/people/api/rest
+		https://developers.google.com/gmail/api/reference/rest
 		https://aaronparecki.com/oauth-2-simplified/
 	}
 	Needs: 3.11.0 ;; using try/with instead of deprecated try/except
@@ -45,10 +46,20 @@ config: function[
 			https://www.googleapis.com/auth/contacts.readonly        ;; See and download your contacts
 			https://www.googleapis.com/auth/contacts.other.readonly  ;; See and download contact info automatically saved in your "Other contacts"
 			https://www.googleapis.com/auth/userinfo.profile         ;; See your personal info, including any personal info you've made publicly available
+
+			https://www.googleapis.com/auth/gmail.readonly           ;; View your email messages and settings
 		]
 		store-config ctx
 	]
 	ctx
+]
+
+add-scope: function[scope [url! ref!]][
+	ctx: config
+	if ref? scope [scope: join https://www.googleapis.com/auth/ scope]
+	unless find ctx/scopes scope [ append ctx/scopes scope ]
+	remove/key ctx 'token ;; when scopes changes, token must be reauthorized
+	store-config ctx
 ]
 
 store-config: function[
@@ -265,5 +276,48 @@ people: context [
 		;; https://developers.google.com/people/v1/other-contacts
 		;; requires scope: auth/contacts.other.readonly
 		api-get https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses,phoneNumbers
+	]
+]
+
+;@@ maybe using a dialected requests?
+gmail: function [request [ref! block!]][
+	unless block? request [request: to block! request]
+	collect [
+		parse request [any [
+			'profile (
+				keep api-get https://gmail.googleapis.com/gmail/v1/users/me/profile
+				;; Requires one of the following OAuth scopes:
+				;; https://mail.google.com/
+				;; https://www.googleapis.com/auth/gmail.modify
+				;; https://www.googleapis.com/auth/gmail.compose
+				;; https://www.googleapis.com/auth/gmail.readonly
+				;; https://www.googleapis.com/auth/gmail.metadata
+
+				;; Returns something like:
+				;;	#(
+				;;		emailAddress: "some@email"
+				;;		messagesTotal: 1234
+				;;		threadsTotal: 23
+				;;		historyId: "16337600"
+				;;	)
+			)
+			|
+			'messages (
+				keep api-get https://gmail.googleapis.com/gmail/v1/users/me/messages
+
+				;; Returns something like:
+				;;	#(
+				;;		messages: [#(
+				;;	 	    id: "18949a4bbc4cce97"
+				;;	 	    threadId: "189446292fce7946"
+				;;	 	)]
+				;;	 	nextPageToken: "05405932033369967487"
+    			;;	 	resultSizeEstimate: 201
+    			;;	)
+			)
+			| 'message set id: string! (
+				keep api-get join https://gmail.googleapis.com/gmail/v1/users/me/messages/ id
+			)
+		]]
 	]
 ]
