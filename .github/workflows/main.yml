@@ -26,10 +26,10 @@ jobs:
         REBOL_SAFE_FILE: ${{ secrets.REBOL_SAFE_FILE }}
         REBOL_USER_FILE: ${{ secrets.REBOL_USER_FILE }}
       run: |
-        echo $REBOL_SAFE_FILE > .rebol.safe
-        echo $REBOL_USER_FILE > user.reb
+        echo $REBOL_SAFE_FILE > /home/runner/.rebol.safe
+        echo $REBOL_USER_FILE > /home/runner/user.reb
         ls -la .
-        ./rebol3 --do "? system/options"
+        ./rebol3 --do "? system/options ? system/user"
 
 
 #    - name: Test Google API module
