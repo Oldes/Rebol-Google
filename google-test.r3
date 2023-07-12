@@ -58,8 +58,9 @@ try/with [
 	probe data: first google/gmail [messages]
 ] :print
 
-print as-yellow "User's first message content"
-try/with [
-	probe google/gmail compose [message (data/messages/1/id)]
-] :print
-
+if all [block? data/messages not empty? data/messages][
+	print as-yellow "User's first message content"
+	try/with [
+		probe google/gmail compose [message (data/messages/1/id)]
+	] :print
+]
