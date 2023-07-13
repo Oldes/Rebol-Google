@@ -64,3 +64,15 @@ if all [block? data/messages not empty? data/messages][
 		probe google/gmail compose [message (data/messages/1/id)]
 	] :print
 ]
+
+print-horizontal-line
+
+;google/add-scope @photoslibrary.readonly 
+
+print as-yellow "User's Google Photos albums:"
+probe albums: google/photos/albums
+
+if all [albums not empty? albums] [
+	print as-yellow "Get first item from the album:"
+	probe google/photos/items/part albums/1/id 1
+]

@@ -48,6 +48,10 @@ config: function[
 			https://www.googleapis.com/auth/userinfo.profile         ;; See your personal info, including any personal info you've made publicly available
 
 			https://www.googleapis.com/auth/gmail.readonly           ;; View your email messages and settings
+
+			https://www.googleapis.com/auth/photoslibrary.readonly   ;; View your Google Photos library
+			https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata ;; Manage photos added by this app
+			https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata     ;; Edit the info in your photos, videos, and albums created within this app, including titles, descriptions, and covers
 		]
 		store-config ctx
 	]
@@ -254,9 +258,10 @@ request: func [
 	]
 ]
 
-api-get: func [what [any-string!]           ][request 'GET    what none]
-api-put: func [what [any-string!] /with data][request 'PUT    what data]
-api-del: func [what [any-string!]           ][request 'DELETE what none]
+api-get:  func [what [any-string!]           ][request 'GET    what none]
+api-put:  func [what [any-string!] /with data][request 'PUT    what data]
+api-del:  func [what [any-string!]           ][request 'DELETE what none]
+api-post: func [what [any-string!]       data][request 'POST   what data]
 
 
 ;@@ TODO: write more API functions....
@@ -320,3 +325,61 @@ gmail: function [request [ref! block!]][
 		]]
 	]
 ]
+
+photos: context [
+	;; Required scopes: photoslibrary.readonly or photoslibrary.readonly.appcreateddata
+	albums: function[
+		"Resolve all user's Google Photos albums"
+		/part          "Limit number of results"
+		length [integer!]
+	][
+		url: https://photoslibrary.googleapis.com/v1/albums
+		nextPageToken: none
+		result: clear []
+		until [
+			data: api-get rejoin [url "?pageToken=" any [nextPageToken ""]]
+			if any [not data not data/albums][break]
+			append result data/albums
+			if all [part length <= length? result][
+				;; it is possible to receive more items then requested length
+				;; crop it in such a case...
+				clear skip result length
+				;; and stop, as we have enough results
+				break
+			]
+			none? nextPageToken: data/nextPageToken
+		]
+		result
+	]
+
+	items: function[
+		"List all of the media items in an album"
+		album [string! ref!]
+		/with          "Limit search based on content, date, and other properties"
+		filters [map!] "https://developers.google.com/photos/library/guides/apply-filters"
+		/part          "Limit number of results"
+		length [integer!]
+	][
+		url: https://photoslibrary.googleapis.com/v1/mediaItems:search
+		req: #() ;; no copy, because it is reused for all requests
+		req/albumId:  album
+		req/pageSize: either part [min 100 length][100]
+		nextPageToken: none
+		result: clear []
+		until [
+			data: api-post rejoin [url "?pageToken=" any [nextPageToken ""]] :req
+			if any [not data not data/mediaItems][break]
+			append result data/mediaItems
+			if all [part length <= length? result][
+				;; it is possible to receive more items then requested length
+				;; crop it in such a case...
+				clear skip result length
+				;; and stop, as we have enough results
+				break
+			]
+			none? nextPageToken: data/nextPageToken
+		]
+		result
+	]
+]
+
