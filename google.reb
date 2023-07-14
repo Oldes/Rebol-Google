@@ -1,12 +1,12 @@
 Rebol [
 	Title:   "Google"
 	Purpose: "Google Web API access (experimental)"
-	Date:    11-Jul-2023
+	Date:    14-Jul-2023
 	Author:  @Oldes
 	File:    %google.reb
 	Name:    'google
 	Type:    'module
-	Version:  0.0.4
+	Version:  0.0.5
 	Require: 'httpd
 	Note: {
 		Useful info:
@@ -43,9 +43,10 @@ config: function[
 		]
 		;; All scopes?
 		ctx/scopes: [
-			https://www.googleapis.com/auth/contacts.readonly        ;; See and download your contacts
-			https://www.googleapis.com/auth/contacts.other.readonly  ;; See and download contact info automatically saved in your "Other contacts"
-			https://www.googleapis.com/auth/userinfo.profile         ;; See your personal info, including any personal info you've made publicly available
+			https://www.googleapis.com/auth/contacts
+			;https://www.googleapis.com/auth/contacts.readonly       ;; See and download your contacts
+			;https://www.googleapis.com/auth/contacts.other.readonly ;; See and download contact info automatically saved in your "Other contacts"
+			;https://www.googleapis.com/auth/userinfo.profile        ;; See your personal info, including any personal info you've made publicly available
 
 			https://www.googleapis.com/auth/gmail.readonly           ;; View your email messages and settings
 
@@ -210,6 +211,15 @@ refresh: function[
 	ctx [map!]
 ][
 	sys/log/info 'GOOGLE "Refreshing Google API token."
+	if any [
+		none? ctx/token/refresh_token
+		none? ctx/client-id
+		none? ctx/client-secret
+	][
+		sys/log/error 'GOOGLE "Not sufficient info to refresh a token!"
+		drop-token
+		return authorize ctx
+	]
 	ctx/token: load-json write https://www.googleapis.com/oauth2/v4/token compose [
 		POST [
 			Content-Type: "application/x-www-form-urlencoded"
@@ -220,6 +230,8 @@ refresh: function[
 			"&client_secret=" ctx/client-secret
 		])
 	]
+	ctx/token/expires_in: now + (to time! ctx/token/expires_in)
+	store-config ctx
 ]
 
 request: func [
@@ -236,19 +248,22 @@ request: func [
 		unless ctx/token [return none  ] ;; exit if still not present
 		if now >= ctx/token/expires_in [ refresh ctx ]
 		header/Authorization: join "Bearer " ctx/token/access_token
+		header/Accept: "application/json"
 		if map? data [
 			data: to-json data
 			header/Content-Type: "application/json"
 		]
+		sys/log/info 'GOOGLE [method as-green what]
 
 		result: write/all what reduce [
 			method header any [data ""]
 		]
 		data: load-json result/3
 		either result/1 >= 400 [
-			sys/log/error 'GOOGLE ["Failed" method "of" as-green what]
-			if data/error [
-				sys/log/error 'GOOGLE [data/error_description "-" data/error]
+			sys/log/error 'GOOGLE [method as-red what]
+			if all [map? data data/error] [
+				if data/error_description [sys/log/error 'GOOGLE data/error_description]
+				sys/log/error 'GOOGLE [data/error]
 			]
 			none
 		][	data ]
@@ -263,23 +278,111 @@ api-put:  func [what [any-string!] /with data][request 'PUT    what data]
 api-del:  func [what [any-string!]           ][request 'DELETE what none]
 api-post: func [what [any-string!]       data][request 'POST   what data]
 
+all-personFields: [
+	@addresses
+	@ageRanges
+	@biographies
+	@birthdays
+	@calendarUrls
+	@clientData
+	@coverPhotos
+	@emailAddresses
+	@events
+	@externalIds
+	@genders
+	@imClients
+	@interests
+	@locales
+	@locations
+	@memberships
+	@metadata
+	@miscKeywords
+	@names
+	@nicknames
+	@occupations
+	@organizations
+	@phoneNumbers
+	@photos
+	@relations
+	@sipAddresses
+	@skills
+	@urls
+	@userDefined
+]
 
 ;@@ TODO: write more API functions....
 people: context [
 	profile: does [
 		;; https://developers.google.com/people/v1/profiles
 		;; requires scope: auth/userinfo.profile
-		api-get https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,phoneNumbers
+		contact/with none combine/with all-personFields #","
 	]
-	contacts: does [
+	contact: function[
+		"Get contact info"
+		id [string! none!] "resource name: people/*"
+		/with fields {Default is: "metadata,names,emailAddresses"}
+	][
+		case [
+			not id [id: "people/me"]
+			not parse id ["people/" some system/catalog/bitsets/alpha-numeric][
+				sys/log/error 'GOOGLE ["Invalid resource name:" as-red mold/flat id]
+				return none
+			]
+		]
+		api-get rejoin [
+			https://people.googleapis.com/v1/ id
+			"?personFields=" any [fields "metadata,names,emailAddresses"]
+		]
+	]
+	contacts: function[
+		/with fields {Default is: "metadata,names,emailAddresses"}
+		/part        "Limit number of results"
+		length [integer!]
+	][
 		;; https://developers.google.com/people/v1/contacts
 		;; requires scope: auth/contacts.readonly
-		api-get https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses,phoneNumbers
+		url: https://people.googleapis.com/v1/people/me/connections
+
+		pageSize: min 1000 any [length 500] ;; request 500, but not more then maximum 1000
+		nextPageToken: none 
+		result: clear []
+		until [
+			data: api-get rejoin [
+				url "?pageSize=" pageSize
+				"&personFields=" any [fields "metadata,names,emailAddresses"]
+				"&pageToken=" any [nextPageToken ""]
+			]
+			if any [not data not data/connections][break]
+			append result data/connections
+			if all [part length <= length? result][
+				;; it is possible to receive more items then requested length
+				;; crop it in such a case...
+				clear skip result length
+				;; and stop, as we have enough results
+				break
+			]
+			none? nextPageToken: data/nextPageToken
+		]
+		result
 	]
-	other-contacts: does [
-		;; https://developers.google.com/people/v1/other-contacts
-		;; requires scope: auth/contacts.other.readonly
-		api-get https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses,phoneNumbers
+
+	create: function[
+		"Create a new contact"
+		contact [map!] "https://developers.google.com/people/api/rest/v1/people#Person"
+	][	;; https://developers.google.com/people/api/rest/v1/people/createContact
+		;; requires scope: https://www.googleapis.com/auth/contacts
+		api-post https://people.googleapis.com/v1/people:createContact :contact
+	]
+	delete: function[
+		"Remove contact"
+		id [string!] "resource name: people/*"
+	][	;; https://developers.google.com/people/api/rest/v1/people/deleteContact
+		;; requires scope: https://www.googleapis.com/auth/contacts
+		unless parse id ["people/" some system/catalog/bitsets/alpha-numeric][
+			sys/log/error 'GOOGLE ["Invalid resource name:" as-red mold/flat id]
+			return none
+		]
+		api-del rejoin [https://people.googleapis.com/v1/ id ":deleteContact"]
 	]
 ]
 
