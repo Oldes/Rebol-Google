@@ -5,8 +5,8 @@ Rebol [
 	File:   %google-test.r3
 ]
 
-system/options/quiet: false
-system/options/log/http: 0
+system/options/quiet: false  ;; allow traces
+system/options/log/http: 0   ;; turn off all HTTP traces 
 
 
 
@@ -31,7 +31,7 @@ people: :google/people ;; shortcut to People API context
 do-test "User's profile" [
 	probe people/profile
 ]
-quit
+
 do-test "Create a new contact" [
 	probe person: people/create #(
 		names: [#(
