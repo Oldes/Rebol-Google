@@ -226,7 +226,7 @@ refresh: function[
 			Content-Type: "application/x-www-form-urlencoded"
 		]( rejoin [
 			"grant_type=refresh_token"
-			"&refresh_token=" ctx/token/refresh_token
+			"&refresh_token=" enhex ctx/token/refresh_token
 			"&client_id="     ctx/client-id
 			"&client_secret=" ctx/client-secret
 		])
