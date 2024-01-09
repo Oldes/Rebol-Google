@@ -133,28 +133,29 @@ authorize: function [
 	; Result from the server is returned as a redirect, so let's start simple server
 	; listening on specified port (limited to accept only local requests, as the redirect is
 	; going from the browser actually.. it automaticaly close itself once data are received
-	result: system/modules/httpd/http-server/config/actor port [
-		root:       #[false] ; we are not serving any content!
-		keep-alive: #[false]
-	][	;- Server's actor functions
-		On-Accept: func [info [object!]][
-			; allow only connections from localhost
-			; TRUE = accepted, FALSE = refuse
-			find [ 127.0.0.1 ] info/remote-ip 
-		]
-		On-Header: func [ctx [object!]][
-			either ctx/inp/target/file == %/ [
-				ctx/out/status: 200
-				ctx/out/content: ajoin [
-					"<h1>OAuth2 Google Callback</h1>"
-					"<br/>Header:<pre>" mold ctx/inp/header </pre>
-					"<br/>Values:<pre>" mold ctx/inp/target/values </pre>
-					"<h2>You can close this window and return back to Rebol</h2>"
+	result: serve-http [
+		port: :port
+		actor: [
+			;- Server's actor functions
+			On-Accept: func [info [object!]][
+				; allow only connections from localhost
+				; TRUE = accepted, FALSE = refuse
+				find [ 127.0.0.1 ] info/remote-ip 
+			]
+			On-Header: func [ctx [object!]][
+				either ctx/inp/target/file == %/ [
+					ctx/out/status: 200
+					ctx/out/content: ajoin [
+						"<h1>OAuth2 Google Callback</h1>"
+						"<br/>Header:<pre>" mold ctx/inp/header </pre>
+						"<br/>Values:<pre>" mold ctx/inp/target/values </pre>
+						"<h2>You can close this window and return back to Rebol</h2>"
+					]
+					ctx/done?: ctx/inp/target/values
+				][
+					ctx/out/status: 405
+					ctx/done?: true
 				]
-				ctx/done?: ctx/inp/target/values
-			][
-				ctx/out/status: 405
-				ctx/done?: true
 			]
 		]
 	]
