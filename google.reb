@@ -133,7 +133,7 @@ authorize: function [
 	; Result from the server is returned as a redirect, so let's start simple server
 	; listening on specified port (limited to accept only local requests, as the redirect is
 	; going from the browser actually.. it automaticaly close itself once data are received
-	result: serve-http [
+	result: system/modules/httpd/serve-http [
 		port: :port
 		actor: [
 			;- Server's actor functions
@@ -191,6 +191,10 @@ authorize: function [
 		either result/1 == 200 [
 			ctx/token: load-json result/3
 			ctx/token/expires_in: time + (to time! ctx/token/expires_in)
+			;; the refresh_token must be stored outside of the token value, because
+			;; the token value is rewriten on refresh with a content, which does not
+			;; have the refresh_token value anymore (it is resolved only after authentication)
+			ctx/refresh_token: ctx/token/refresh_token
 		][
 			result: load-json result/3
 			sys/log/error 'GOOGLE "Failed to receive Google token!"
@@ -213,7 +217,7 @@ refresh: function[
 ][
 	sys/log/info 'GOOGLE "Refreshing Google API token."
 	if any [
-		none? ctx/token/refresh_token
+		none? ctx/refresh_token
 		none? ctx/client-id
 		none? ctx/client-secret
 	][
@@ -226,7 +230,7 @@ refresh: function[
 			Content-Type: "application/x-www-form-urlencoded"
 		]( rejoin [
 			"grant_type=refresh_token"
-			"&refresh_token=" enhex ctx/token/refresh_token
+			"&refresh_token=" enhex ctx/refresh_token
 			"&client_id="     ctx/client-id
 			"&client_secret=" ctx/client-secret
 		])
