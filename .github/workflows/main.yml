@@ -21,14 +21,10 @@ jobs:
       with:
         product: Bulk
 
-    - name: Setup Rebol user enironment
+    - name: Test Google API module
       env:
         REBOL_SAFE_FILE: ${{ secrets.REBOL_SAFE_FILE }}
         REBOL_USER_FILE: ${{ secrets.REBOL_USER_FILE }}
       run: |
         echo $REBOL_USER_FILE > /home/runner/user.reb
-        ./rebol3 --do "? system/user"
-
-
-    - name: Test Google API module
-      run:  ./rebol3 google-test.r3
+        ./rebol3 google-test.r3
