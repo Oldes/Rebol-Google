@@ -3,6 +3,7 @@ Rebol [
 	Date:   11-Jul-2023
 	Author: @Oldes
 	File:   %google-test.r3
+	Needs:  3.16.0
 ]
 
 system/options/quiet: false  ;; allow traces
@@ -33,16 +34,16 @@ do-test "User's profile" [
 ]
 
 do-test "Create a new contact" [
-	probe person: people/create #(
-		names: [#(
+	probe person: people/create #[
+		names: [#[
 			familyName: "Example"
 			givenName:  "Test"
-		)]
+		]]
 		emailAddresses: [
-			#(value: "test@example.com")
-			#(value: "another-test@example.com")
+			#[value: "test@example.com"]
+			#[value: "another-test@example.com"]
 		]
-	)
+	]
 ]
 
 if person [

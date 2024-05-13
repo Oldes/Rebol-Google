@@ -1,12 +1,12 @@
 Rebol [
 	Title:   "Google"
 	Purpose: "Google Web API access (experimental)"
-	Date:    14-Jul-2023
+	Date:    13-May-2024
 	Author:  @Oldes
 	File:    %google.reb
 	Name:    'google
 	Type:    'module
-	Version:  0.0.5
+	Version:  0.0.6
 	Require: 'httpd
 	Note: {
 		Useful info:
@@ -39,7 +39,7 @@ config: function[
 			ctx/client-secret: ask/hide "Client Secret: "
 		][	;; when user hits ESC...
 			sys/log/error 'GOOGLE "Missing credentials!"
-			return #()
+			return make map! []
 		]
 		;; All scopes?
 		ctx/scopes: [
@@ -239,14 +239,12 @@ refresh: function[
 	store-config ctx
 ]
 
-request: func [
+request: function/with [
 	method [word!]
 	what   [any-string!]
 	data   [any-type!]
-	/local ctx header result
 ][
-	header: clear #()
-
+	clear header
 	try/with [
 		ctx: config
 		unless ctx/token [ctx: authorize ctx] ;; resolve the token
@@ -276,6 +274,8 @@ request: func [
 		sys/log/error 'GOOGLE system/state/last-error
 		none
 	]
+][
+	header: make map! 6
 ]
 
 api-get:  func [what [any-string!]           ][request 'GET    what none]
@@ -406,26 +406,26 @@ gmail: function [request [ref! block!]][
 				;; https://www.googleapis.com/auth/gmail.metadata
 
 				;; Returns something like:
-				;;	#(
+				;;	#[
 				;;		emailAddress: "some@email"
 				;;		messagesTotal: 1234
 				;;		threadsTotal: 23
 				;;		historyId: "16337600"
-				;;	)
+				;;	]
 			)
 			|
 			'messages (
 				keep api-get https://gmail.googleapis.com/gmail/v1/users/me/messages
 
 				;; Returns something like:
-				;;	#(
-				;;		messages: [#(
+				;;	#[
+				;;		messages: [#[
 				;;	 	    id: "18949a4bbc4cce97"
 				;;	 	    threadId: "189446292fce7946"
 				;;	 	)]
 				;;	 	nextPageToken: "05405932033369967487"
     			;;	 	resultSizeEstimate: 201
-    			;;	)
+    			;;	]
 			)
 			| 'message set id: string! (
 				keep api-get join https://gmail.googleapis.com/gmail/v1/users/me/messages/ id
@@ -469,7 +469,7 @@ photos: context [
 		length [integer!]
 	][
 		url: https://photoslibrary.googleapis.com/v1/mediaItems:search
-		req: #() ;; no copy, because it is reused for all requests
+		req: make map! 4 ;; no copy, because it is reused for all requests
 		req/albumId:  album
 		req/pageSize: either part [min 100 length][100]
 		nextPageToken: none
