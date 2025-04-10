@@ -6,7 +6,7 @@ Rebol [
 	File:    %google.reb
 	Name:    google
 	Type:    module
-	Version:  0.0.7
+	Version:  0.0.8
 	Require: httpd
 	Note: {
 		Useful info:
@@ -53,18 +53,36 @@ config: function[
 			https://www.googleapis.com/auth/photoslibrary.readonly   ;; View your Google Photos library
 			https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata ;; Manage photos added by this app
 			https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata     ;; Edit the info in your photos, videos, and albums created within this app, including titles, descriptions, and covers
+			
+			https://www.googleapis.com/auth/drive.readonly ;; See, edit, create, and delete all of your Google Drive files
 		]
 		store-config ctx
 	]
 	ctx
 ]
 
-add-scope: function[scope [url! ref!]][
-	ctx: config
+has-scope?: function[
+	"Returns true if the user has the requested scope"
+	scope [url! ref!]
+][
 	if ref? scope [scope: join https://www.googleapis.com/auth/ scope]
-	unless find ctx/scopes scope [ append ctx/scopes scope ]
+	to logic! all [
+		ctx: user's google-api
+		find ctx/scopes scope
+	]
+]
+
+add-scope: function[
+	"Adds a new scope if it doesn't already exist. The user must reauthorize before any API use!"
+	scope [url! ref!]
+][
+	if ref? scope [scope: join https://www.googleapis.com/auth/ scope]
+	if has-scope? scope [return true] ;; returns true if the scope already exists
+	ctx: config
+	append ctx/scopes scope
 	remove/key ctx 'token ;; when scopes changes, token must be reauthorized
 	store-config ctx
+	true
 ]
 
 store-config: function[
@@ -507,3 +525,46 @@ photos: context [
 	]
 ]
 
+;@@ TODO: write more API functions....
+drive: context [
+	;- https://developers.google.com/workspace/drive/api/guides/about-sdk
+	;@@ WIP!!!
+	files: function[
+		"Lists the user's files."
+		query [string!] {e.g.: "name contains 'Foo' AND createdTime > '2025-04-01T00:00:00Z' AND trashed=false"}
+		/part          "Limit number of results"
+		length [integer!]
+	][
+		url: https://www.googleapis.com/drive/v3/files
+		;; Google Drive has different API than Google Photos. It uses just GET api!
+
+		req: make map! 4 ;; no copy, because it is reused for all requests
+		req/pageSize: either part [min 1000 length][1000]
+
+		nextPageToken: none
+		result: clear []
+
+		until [
+			
+			data: api-get rejoin [
+				url
+				"?pageToken=" any [nextPageToken ""]
+				"&q=" query
+				"&fields=nextPageToken,files(id,name,mimeType,modifiedTime,quotaBytesUsed,parents,teamDriveId,size)"
+			]
+			if any [not data not data/files][break]
+			append result data/files
+			if all [part length <= length? result][
+				;; it is possible to receive more items then requested length
+				;; crop it in such a case...
+				clear skip result length
+				;; and stop, as we have enough results
+				break
+			]
+			none? nextPageToken: data/nextPageToken
+		]
+		result
+	]
+
+
+]
