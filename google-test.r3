@@ -165,9 +165,22 @@ if any [
 	do-test "User's storage quota info" [
 		probe data: google/api-get https://www.googleapis.com/drive/v3/about?fields=storageQuota
 	]
-	;@@ WIP!!!
-	do-test "List some folders from the Drive" [
-		probe data: drive/files/part "q=mimeType='application/vnd.google-apps.folder'" 10
+	do-test "List the 10 largest files" [
+		probe data: drive/files [limit: 10 orderBy: "quotaBytesUsed desc"]
 	]
-
+	do-test "List the 10 most recently modified folders" [
+		probe data: drive/files [
+			query:   "mimeType='application/vnd.google-apps.folder'"
+			orderBy: "modifiedTime desc"
+			fields: [id name parents modifiedTime]
+			limit: 10
+		]
+	]
+	do-test "List all files modified since the given date" [
+		probe data: drive/files [
+			query:   "modifiedTime > '2024-01-01T00:00:00Z' AND trashed=false"
+			orderBy: "modifiedTime"
+			fields:  "files(id,name,parents,modifiedTime)" ;; manually formated
+		]
+	]
 ]

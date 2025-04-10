@@ -64,3 +64,36 @@ google/add-scope @userinfo.profile
 List of all Google's OAuth2 scopes may be found here:
 https://developers.google.com/identity/protocols/oauth2/scopes
 
+
+## Useful examples
+
+### Check all user's shared drives for new content added since the previous day.
+```rebol
+;; Turn off traces...
+system/options/log/google: 0
+
+;; Construct an object with query parameters used for all drives...
+params: object [
+    query: ajoin [
+        "trashed=false AND createdTime > "
+        format-date-time now/date - 1 "'yyyy-MM-ddThh:mm:sZ'"
+    ]
+    orderBy: 'createdTime
+    corpora: 'drive
+    driveId: none ;; will be set later
+    includeItemsFromAllDrives: true
+    supportsAllDrives: true
+    pageSize: 1000
+    fields: [id name parents mimeType webContentLink modifiedTime createdTime size sha256Checksum]
+]
+
+;; Check for new content in each drive...
+foreach d google/drive/drives [
+    print-horizontal-line
+    print ["DRIVE:" d/name]
+    params/driveId: d/id 
+    data: google/drive/files :params
+    ?? data
+    save ajoin [%recent-data- d/name %.reb] data
+]
+```

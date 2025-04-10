@@ -6,7 +6,7 @@ Rebol [
 	File:    %google.reb
 	Name:    google
 	Type:    module
-	Version:  0.0.8
+	Version:  0.0.9
 	Require: httpd
 	Note: {
 		Useful info:
@@ -528,33 +528,51 @@ photos: context [
 ;@@ TODO: write more API functions....
 drive: context [
 	;- https://developers.google.com/workspace/drive/api/guides/about-sdk
-	;@@ WIP!!!
-	files: function[
+	files: function [
 		"Lists the user's files."
-		query [string!] {e.g.: "name contains 'Foo' AND createdTime > '2025-04-01T00:00:00Z' AND trashed=false"}
-		/part          "Limit number of results"
+		params [block! map! object!] {Query parameters to be used.}
+		/part  "Limit number of results"
 		length [integer!]
 	][
 		url: https://www.googleapis.com/drive/v3/files
 		;; Google Drive has different API than Google Photos. It uses just GET api!
 
-		req: make map! 4 ;; no copy, because it is reused for all requests
-		req/pageSize: either part [min 1000 length][1000]
-
 		nextPageToken: none
 		result: clear []
 
+		query: copy "?"
+		unless find params 'fields [
+			append query ajoin ["fields=" default-files-fields #"&"]
+		]
+
+		foreach [key value] params [
+			key: any [deprecated-params/:key key]
+			switch key [
+				limit [length: attempt [to integer! :value] continue]
+				query [key: 'q] ;; 'query' looks better, 'q' is the real name
+				fields [
+					value: either block? :value [
+						ajoin ["files(" combine/with value #"," #")"]
+					][	to string! :value ]
+					unless find value "nextPageToken" [
+						insert value "nextPageToken," ;; this field is needed
+					]
+				]
+			]
+			;; use only valid key names...
+			if find valid-files-params key [
+				append query ajoin [key #"=" value #"&"]
+			]
+		]
+
 		until [
-			
-			data: api-get rejoin [
-				url
-				"?pageToken=" any [nextPageToken ""]
-				"&q=" query
-				"&fields=nextPageToken,files(id,name,mimeType,modifiedTime,quotaBytesUsed,parents,teamDriveId,size)"
+			data: api-get as url! ajoin [
+				url query
+				if nextPageToken [join "pageToken=" nextPageToken]
 			]
 			if any [not data not data/files][break]
 			append result data/files
-			if all [part length <= length? result][
+			if all [length length <= length? result][
 				;; it is possible to receive more items then requested length
 				;; crop it in such a case...
 				clear skip result length
@@ -566,5 +584,74 @@ drive: context [
 		result
 	]
 
+	drives: function [
+		"Lists the user's shared drives"
+		/with query [string!] "Extra query params, e.g.: {fields=drives(id,name,createdTime)}"
+		/part  "Limit number of results"
+		length [integer!]
+	][
+		url: https://www.googleapis.com/drive/v3/drives
+
+		nextPageToken: none
+		result: clear []
+
+		if all [query #"&" <> last query] [query: join query #"&"] 
+
+		until [
+			data: api-get as url! ajoin [
+				url #"?" any [query ""]
+				if nextPageToken [join "pageToken=" nextPageToken]
+			]
+			if any [not data not data/drives][break]
+			append result data/drives
+			if all [length length <= length? result][
+				;; it is possible to receive more items then requested length
+				;; crop it in such a case...
+				clear skip result length
+				;; and stop, as we have enough results
+				break
+			]
+			none? nextPageToken: data/nextPageToken
+		]
+		result
+	]
+
+	default-files-fields: {nextPageToken,files(id,name,mimeType,modifiedTime,quotaBytesUsed,parents,driveId,size,sha256Checksum)}
+	;; Conversion of deprecated paramaters the the prefered one...
+	deprecated-params: make map! [
+		corpus: corpora
+		includeTeamDriveItems: includeItemsFromAllDrives
+		supportsTeamDrives: supportsAllDrives
+		teamDriveId: driveId
+	]
+	;; These are valid parameters...
+	valid-files-params: [
+		corpora
+		driveId
+		includeItemsFromAllDrives
+		orderBy
+		pageSize
+		pageToken
+		q
+		spaces
+		supportsAllDrives
+		includePermissionsForView
+		includeLabels
+		fields
+	]
+	;; These values may be used to order the files output...
+	orderByKeys: [
+		createdTime      ;; When the file was created.
+		folder           ;; The folder ID. This field is sorted using alphabetical ordering.
+		modifiedByMeTime ;; The last time the file was modified by the user.
+		modifiedTime     ;; The last time the file was modified by anyone.
+		name             ;; The name of the file. This field is sorted using alphabetical ordering, so 1, 12, 2, 22.
+		name_natural     ;; The name of the file. This field is sorted using natural sort ordering, so 1, 2, 12, 22.
+		quotaBytesUsed   ;; The number of storage quota bytes used by the file.
+		recency          ;; The most recent timestamp from the file's date-time fields.
+		sharedWithMeTime ;; When the file was shared with the user, if applicable.
+		starred          ;; Whether the user has starred the file.
+		viewedByMeTime   ;; The last time the file was viewed by the user.
+	]
 
 ]
