@@ -1,17 +1,27 @@
 Rebol [
 	Title:  "Google API test"
-	Date:   11-Jul-2023
+	Date:   10-Apr-2025
 	Author: @Oldes
 	File:   %google-test.r3
 	Needs:  3.16.0
+	Note: {
+		When running this test in CI, a valid token is expected.
+		Since authentication requires user input, the test may fail if the user is not authenticated.
+	}
 ]
 
 system/options/quiet: false  ;; allow traces
 system/options/log/http: 0   ;; turn off all HTTP traces 
 
-
+unless system/user/name [
+	sys/log/info 'REBOL {Using "google-test" as the user!}
+	su/p google-test ""
+]
 
 google: import %google.reb
+
+try [system/schemes/httpd/set-verbose 1]
+
 ;google/drop-token ;; without token, user will be forced to authenticate again
 
 
@@ -28,8 +38,8 @@ do-test: func[title code [block!]][
 people: :google/people ;; shortcut to People API context
 
 ;google/add-scope @contacts
-
 do-test "User's profile" [
+	;google/add-scope @userinfo.profile  ;; See your personal info, including any personal info you've made publicly available
 	probe people/profile
 ]
 
@@ -86,6 +96,9 @@ do-test "User's GMail profile" [
 ]
 do-test "User's first page of message ids" [
 	probe data: first gmail[messages]
+]
+do-test "User's message ids newer than 1 day" [
+	probe data: first gmail[messages "newer_than:1d"]
 ]
 
 if all [block? data/messages not empty? data/messages][

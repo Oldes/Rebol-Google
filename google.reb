@@ -1,13 +1,13 @@
 Rebol [
 	Title:   "Google"
 	Purpose: "Google Web API access (experimental)"
-	Date:    13-May-2024
+	Date:    10-Apr-2025
 	Author:  @Oldes
 	File:    %google.reb
-	Name:    'google
-	Type:    'module
-	Version:  0.0.6
-	Require: 'httpd
+	Name:    google
+	Type:    module
+	Version:  0.0.7
+	Require: httpd
 	Note: {
 		Useful info:
 		https://developers.google.com/identity/protocols/oauth2/scopes
@@ -137,7 +137,7 @@ authorize: function [
 		port: :port
 		actor: [
 			;- Server's actor functions
-			On-Accept: func [info [object!]][
+			On-Accept: func [info [object! block!]][
 				; allow only connections from localhost
 				; TRUE = accepted, FALSE = refuse
 				find [ 127.0.0.1 ] info/remote-ip 
@@ -188,18 +188,18 @@ authorize: function [
 				"&code_verifier=" code-verifier
 			])
 		]
+		data: attempt [load-json result/3]
 		either result/1 == 200 [
-			ctx/token: load-json result/3
+			ctx/token: data
 			ctx/token/expires_in: time + (to time! ctx/token/expires_in)
 			;; the refresh_token must be stored outside of the token value, because
 			;; the token value is rewriten on refresh with a content, which does not
 			;; have the refresh_token value anymore (it is resolved only after authentication)
 			ctx/refresh_token: ctx/token/refresh_token
 		][
-			result: load-json result/3
 			sys/log/error 'GOOGLE "Failed to receive Google token!"
-			if result/error [
-				sys/log/error 'GOOGLE [result/error_description "-" result/error]
+			if all [data data/error] [
+				sys/log/error 'GOOGLE [data/error_description "-" data/error]
 			]
 			return none
 		]
@@ -225,18 +225,29 @@ refresh: function[
 		drop-token
 		return authorize ctx
 	]
-	ctx/token: load-json write https://www.googleapis.com/oauth2/v4/token compose [
+	result: write/all https://www.googleapis.com/oauth2/v4/token compose [
 		POST [
 			Content-Type: "application/x-www-form-urlencoded"
-		]( rejoin [
+		]( probe rejoin [
 			"grant_type=refresh_token"
 			"&refresh_token=" enhex ctx/refresh_token
 			"&client_id="     ctx/client-id
 			"&client_secret=" ctx/client-secret
 		])
 	]
-	ctx/token/expires_in: now + (to time! ctx/token/expires_in)
-	store-config ctx
+	data: attempt [load-json result/3]
+	either result/1 == 200 [
+		ctx/token: data
+		ctx/token/expires_in: now + (to time! ctx/token/expires_in)
+		store-config ctx
+	][
+		sys/log/error 'GOOGLE "Failed to refresh the token!"
+		if all [data data/error] [
+			sys/log/error 'GOOGLE [reason/error_description "-" reason/error]
+		]
+		drop-token
+		return authorize ctx
+	]
 ]
 
 request: function/with [
@@ -249,7 +260,9 @@ request: function/with [
 		ctx: config
 		unless ctx/token [ctx: authorize ctx] ;; resolve the token
 		unless ctx/token [return none  ] ;; exit if still not present
-		if now >= ctx/token/expires_in [ refresh ctx ]
+		if now >= ctx/token/expires_in [
+			unless refresh ctx [ return none ] ;; exit.. as we failed authorize and also refresh
+		]
 		header/Authorization: join "Bearer " ctx/token/access_token
 		header/Accept: "application/json"
 		if map? data [
@@ -414,8 +427,11 @@ gmail: function [request [ref! block!]][
 				;;	]
 			)
 			|
-			'messages (
-				keep api-get https://gmail.googleapis.com/gmail/v1/users/me/messages
+			'messages opt [set query: string!] (
+				keep api-get either query [
+					;@@ TODO: url-encode the query?
+					join https://gmail.googleapis.com/gmail/v1/users/me/messages?q= query
+				][	https://gmail.googleapis.com/gmail/v1/users/me/messages]
 
 				;; Returns something like:
 				;;	#[
