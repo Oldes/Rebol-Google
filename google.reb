@@ -1,12 +1,12 @@
 Rebol [
 	Title:   "Google"
 	Purpose: "Google Web API access (experimental)"
-	Date:    10-Apr-2025
+	Date:    17-Apr-2025
 	Author:  @Oldes
 	File:    %google.reb
 	Name:    google
 	Type:    module
-	Version:  0.0.9
+	Version:  0.0.10
 	Require: httpd
 	Note: {
 		Useful info:
@@ -246,7 +246,7 @@ refresh: function[
 	result: write/all https://www.googleapis.com/oauth2/v4/token compose [
 		POST [
 			Content-Type: "application/x-www-form-urlencoded"
-		]( probe rejoin [
+		]( rejoin [
 			"grant_type=refresh_token"
 			"&refresh_token=" enhex ctx/refresh_token
 			"&client_id="     ctx/client-id
@@ -261,7 +261,7 @@ refresh: function[
 	][
 		sys/log/error 'GOOGLE "Failed to refresh the token!"
 		if all [data data/error] [
-			sys/log/error 'GOOGLE [reason/error_description "-" reason/error]
+			sys/log/error 'GOOGLE [data/error_description "-" data/error]
 		]
 		drop-token
 		return authorize ctx
